@@ -1,0 +1,22 @@
+{
+  "project_name": "Amir Ethernet Continuity Tester",
+  "repository_name": "amir-ethernet-continuity-tester",
+  "author": "Amir Mobasheraghdam",
+  "theme": {
+    "primary": "#ff7a00",
+    "background": "#ffffff",
+    "accent": "#ffe4cc",
+    "text": "#222222"
+  },
+  "platform": "Arduino",
+  "version": "2.0.0",
+  "redesign_type": "clean-room rewrite inspired by open-source Ethernet continuity tester projects",
+  "tags": [
+    "arduino",
+    "ethernet",
+    "cable-tester",
+    "continuity",
+    "diagnostics",
+    "orange-white"
+  ]
+}

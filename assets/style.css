@@ -1,0 +1,11 @@
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#fff;color:#222}
+.container{max-width:980px;margin:0 auto;padding:40px 20px}
+.hero{background:linear-gradient(180deg,#fff7ef,#ffffff);border:1px solid #ffd2a8;border-radius:24px;padding:36px;box-shadow:0 10px 30px rgba(255,122,0,.08)}
+.badge{display:inline-block;background:#ff7a00;color:#fff;padding:8px 14px;border-radius:999px;font-weight:700;font-size:14px}
+h1{font-size:42px;line-height:1.1;margin:18px 0 10px;color:#ff7a00}
+.subtitle{font-size:18px;max-width:700px}
+.author{margin-top:14px;font-size:16px}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin-top:28px}
+.card{border:1px solid #ffd2a8;border-radius:20px;padding:24px;background:#fff;box-shadow:0 8px 24px rgba(255,122,0,.06)}
+.card h2{margin-top:0;color:#ff7a00}
+.card ul{padding-left:18px;margin-bottom:0}

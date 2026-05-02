@@ -1,65 +1,54 @@
-/*
-  Amir Ethernet Continuity Tester
-  Author: Amir Mobasheraghdam
-  Theme: Orange / White
-  Version: 2.0.0
-
-  Clean-room rewrite inspired by community Ethernet continuity tester ideas.
-*/
-
 #include "cable_map.h"
 
-struct TestResult {
-  bool continuity[CHANNEL_COUNT];
-  bool miswire[CHANNEL_COUNT];
-  bool shorted[CHANNEL_COUNT];
-  int detectedIndex[CHANNEL_COUNT];
-  bool pass;
+struct Testergebnis {
+  bool verbindung[CHANNEL_COUNT];
+  bool falschVerdrahtet[CHANNEL_COUNT];
+  bool kurzschluss[CHANNEL_COUNT];
+  int erkannterPin[CHANNEL_COUNT];
+  bool bestanden;
 };
 
-TestResult result;
+Testergebnis ergebnis;
 
-void configurePins() {
+void pinsEinrichten() {
   for (int i = 0; i < CHANNEL_COUNT; i++) {
     pinMode(TX_PINS[i], OUTPUT);
     digitalWrite(TX_PINS[i], LOW);
-
     pinMode(RX_PINS[i], INPUT_PULLUP);
   }
 }
 
-void resetResult() {
-  result.pass = true;
+void ergebnisZuruecksetzen() {
+  ergebnis.bestanden = true;
+
   for (int i = 0; i < CHANNEL_COUNT; i++) {
-    result.continuity[i] = false;
-    result.miswire[i] = false;
-    result.shorted[i] = false;
-    result.detectedIndex[i] = -1;
+    ergebnis.verbindung[i] = false;
+    ergebnis.falschVerdrahtet[i] = false;
+    ergebnis.kurzschluss[i] = false;
+    ergebnis.erkannterPin[i] = -1;
   }
 }
 
-int scanTriggeredInputCount(int &firstDetectedIndex) {
-  int count = 0;
-  firstDetectedIndex = -1;
+int erkannteEingaengeZaehlen(int &ersterErkannterPin) {
+  int anzahl = 0;
+  ersterErkannterPin = -1;
 
   for (int i = 0; i < CHANNEL_COUNT; i++) {
-    // INPUT_PULLUP => connected active low
     if (digitalRead(RX_PINS[i]) == LOW) {
-      if (firstDetectedIndex == -1) {
-        firstDetectedIndex = i;
+      if (ersterErkannterPin == -1) {
+        ersterErkannterPin = i;
       }
-      count++;
+      anzahl++;
     }
   }
 
-  return count;
+  return anzahl;
 }
 
-void testCable() {
-  resetResult();
+void kabelTesten() {
+  ergebnisZuruecksetzen();
 
   for (int tx = 0; tx < CHANNEL_COUNT; tx++) {
-    // Set all outputs low
     for (int i = 0; i < CHANNEL_COUNT; i++) {
       digitalWrite(TX_PINS[i], LOW);
     }
@@ -68,23 +57,23 @@ void testCable() {
     digitalWrite(TX_PINS[tx], HIGH);
     delay(STABILIZE_DELAY_MS);
 
-    int detected = -1;
-    int count = scanTriggeredInputCount(detected);
+    int erkannt = -1;
+    int anzahl = erkannteEingaengeZaehlen(erkannt);
 
-    if (count == 0) {
-      result.continuity[tx] = false;
-      result.pass = false;
-    } else if (count > 1) {
-      result.continuity[tx] = false;
-      result.shorted[tx] = true;
-      result.pass = false;
+    if (anzahl == 0) {
+      ergebnis.verbindung[tx] = false;
+      ergebnis.bestanden = false;
+    } else if (anzahl > 1) {
+      ergebnis.verbindung[tx] = false;
+      ergebnis.kurzschluss[tx] = true;
+      ergebnis.bestanden = false;
     } else {
-      result.continuity[tx] = true;
-      result.detectedIndex[tx] = detected;
+      ergebnis.verbindung[tx] = true;
+      ergebnis.erkannterPin[tx] = erkannt;
 
-      if (detected != EXPECTED_MAP[tx]) {
-        result.miswire[tx] = true;
-        result.pass = false;
+      if (erkannt != EXPECTED_MAP[tx]) {
+        ergebnis.falschVerdrahtet[tx] = true;
+        ergebnis.bestanden = false;
       }
     }
 
@@ -93,65 +82,67 @@ void testCable() {
   }
 }
 
-void printHeader() {
+void kopfzeileDrucken() {
   Serial.println();
   Serial.println(F("=========================================="));
-  Serial.println(F("   AMIR ETHERNET CONTINUITY TESTER"));
-  Serial.println(F("   Author: Amir Mobasheraghdam"));
-  Serial.println(F("   Theme : Orange / White"));
+  Serial.println(F("   AMIR ETHERNET DURCHGANGSPRUEFER"));
+  Serial.println(F("   Autor : Amir Mobasheraghdam"));
+  Serial.println(F("   Thema : Orange / Weiss"));
   Serial.println(F("=========================================="));
 }
 
-void printChannelReport(int channel) {
-  Serial.print(F("Wire "));
-  Serial.print(channel + 1);
+void kanalberichtDrucken(int kanal) {
+  Serial.print(F("Ader "));
+  Serial.print(kanal + 1);
   Serial.print(F(": "));
 
-  if (result.shorted[channel]) {
-    Serial.println(F("SHORT"));
+  if (ergebnis.kurzschluss[kanal]) {
+    Serial.println(F("KURZSCHLUSS"));
     return;
   }
 
-  if (!result.continuity[channel]) {
-    Serial.println(F("OPEN"));
+  if (!ergebnis.verbindung[kanal]) {
+    Serial.println(F("UNTERBROCHEN"));
     return;
   }
 
-  if (result.miswire[channel]) {
-    Serial.print(F("MISWIRE -> detected on RX "));
-    Serial.println(result.detectedIndex[channel] + 1);
+  if (ergebnis.falschVerdrahtet[kanal]) {
+    Serial.print(F("FALSCH VERDRAHTET -> erkannt an RX "));
+    Serial.println(ergebnis.erkannterPin[kanal] + 1);
     return;
   }
 
-  Serial.print(F("PASS -> RX "));
-  Serial.println(result.detectedIndex[channel] + 1);
+  Serial.print(F("OK -> RX "));
+  Serial.println(ergebnis.erkannterPin[kanal] + 1);
 }
 
-void printSummary() {
-  printHeader();
+void zusammenfassungDrucken() {
+  kopfzeileDrucken();
 
   for (int i = 0; i < CHANNEL_COUNT; i++) {
-    printChannelReport(i);
+    kanalberichtDrucken(i);
   }
 
   Serial.println(F("------------------------------------------"));
-  if (result.pass) {
-    Serial.println(F("RESULT: PASS"));
+
+  if (ergebnis.bestanden) {
+    Serial.println(F("ERGEBNIS: BESTANDEN"));
   } else {
-    Serial.println(F("RESULT: FAIL"));
+    Serial.println(F("ERGEBNIS: FEHLER"));
   }
+
   Serial.println(F("=========================================="));
 }
 
 void setup() {
   Serial.begin(115200);
-  configurePins();
+  pinsEinrichten();
   delay(250);
-  printHeader();
+  kopfzeileDrucken();
 }
 
 void loop() {
-  testCable();
-  printSummary();
+  kabelTesten();
+  zusammenfassungDrucken();
   delay(LOOP_DELAY_MS);
 }

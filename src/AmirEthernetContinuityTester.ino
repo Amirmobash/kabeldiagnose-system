@@ -1,16 +1,16 @@
 #include "cable_map.h"
 
-struct Testergebnis {
-  bool verbindung[CHANNEL_COUNT];
-  bool falschVerdrahtet[CHANNEL_COUNT];
-  bool kurzschluss[CHANNEL_COUNT];
-  int erkannterPin[CHANNEL_COUNT];
-  bool bestanden;
+struct PruefErgebnis {
+  bool hatVerbindung[CHANNEL_COUNT];
+  bool istFalschVerdrahtet[CHANNEL_COUNT];
+  bool hatKurzschluss[CHANNEL_COUNT];
+  int erkannterRxPin[CHANNEL_COUNT];
+  bool istBestanden;
 };
 
-Testergebnis ergebnis;
+PruefErgebnis ergebnis;
 
-void pinsEinrichten() {
+void pinsVorbereiten() {
   for (int i = 0; i < CHANNEL_COUNT; i++) {
     pinMode(TX_PINS[i], OUTPUT);
     digitalWrite(TX_PINS[i], LOW);
@@ -18,117 +18,125 @@ void pinsEinrichten() {
   }
 }
 
-void ergebnisZuruecksetzen() {
-  ergebnis.bestanden = true;
+void ergebnisLoeschen() {
+  ergebnis.istBestanden = true;
 
   for (int i = 0; i < CHANNEL_COUNT; i++) {
-    ergebnis.verbindung[i] = false;
-    ergebnis.falschVerdrahtet[i] = false;
-    ergebnis.kurzschluss[i] = false;
-    ergebnis.erkannterPin[i] = -1;
+    ergebnis.hatVerbindung[i] = false;
+    ergebnis.istFalschVerdrahtet[i] = false;
+    ergebnis.hatKurzschluss[i] = false;
+    ergebnis.erkannterRxPin[i] = -1;
   }
 }
 
-int erkannteEingaengeZaehlen(int &ersterErkannterPin) {
-  int anzahl = 0;
-  ersterErkannterPin = -1;
+void alleSenderAusschalten() {
+  for (int i = 0; i < CHANNEL_COUNT; i++) {
+    digitalWrite(TX_PINS[i], LOW);
+  }
+}
+
+int aktiveEmpfaengerZaehlen(int &ersterTreffer) {
+  int anzahlTreffer = 0;
+  ersterTreffer = -1;
 
   for (int i = 0; i < CHANNEL_COUNT; i++) {
     if (digitalRead(RX_PINS[i]) == LOW) {
-      if (ersterErkannterPin == -1) {
-        ersterErkannterPin = i;
+      if (ersterTreffer == -1) {
+        ersterTreffer = i;
       }
-      anzahl++;
+      anzahlTreffer++;
     }
   }
 
-  return anzahl;
+  return anzahlTreffer;
 }
 
-void kabelTesten() {
-  ergebnisZuruecksetzen();
+void einzelneAderPruefen(int sender) {
+  alleSenderAusschalten();
+  delay(2);
 
-  for (int tx = 0; tx < CHANNEL_COUNT; tx++) {
-    for (int i = 0; i < CHANNEL_COUNT; i++) {
-      digitalWrite(TX_PINS[i], LOW);
+  digitalWrite(TX_PINS[sender], HIGH);
+  delay(STABILIZE_DELAY_MS);
+
+  int erkannterPin = -1;
+  int treffer = aktiveEmpfaengerZaehlen(erkannterPin);
+
+  if (treffer == 0) {
+    ergebnis.hatVerbindung[sender] = false;
+    ergebnis.istBestanden = false;
+  } else if (treffer > 1) {
+    ergebnis.hatVerbindung[sender] = false;
+    ergebnis.hatKurzschluss[sender] = true;
+    ergebnis.istBestanden = false;
+  } else {
+    ergebnis.hatVerbindung[sender] = true;
+    ergebnis.erkannterRxPin[sender] = erkannterPin;
+
+    if (erkannterPin != EXPECTED_MAP[sender]) {
+      ergebnis.istFalschVerdrahtet[sender] = true;
+      ergebnis.istBestanden = false;
     }
-
-    delay(2);
-    digitalWrite(TX_PINS[tx], HIGH);
-    delay(STABILIZE_DELAY_MS);
-
-    int erkannt = -1;
-    int anzahl = erkannteEingaengeZaehlen(erkannt);
-
-    if (anzahl == 0) {
-      ergebnis.verbindung[tx] = false;
-      ergebnis.bestanden = false;
-    } else if (anzahl > 1) {
-      ergebnis.verbindung[tx] = false;
-      ergebnis.kurzschluss[tx] = true;
-      ergebnis.bestanden = false;
-    } else {
-      ergebnis.verbindung[tx] = true;
-      ergebnis.erkannterPin[tx] = erkannt;
-
-      if (erkannt != EXPECTED_MAP[tx]) {
-        ergebnis.falschVerdrahtet[tx] = true;
-        ergebnis.bestanden = false;
-      }
-    }
-
-    digitalWrite(TX_PINS[tx], LOW);
-    delay(5);
   }
+
+  digitalWrite(TX_PINS[sender], LOW);
+  delay(5);
 }
 
-void kopfzeileDrucken() {
-  Serial.println();
-  Serial.println(F("=========================================="));
-  Serial.println(F("   AMIR ETHERNET DURCHGANGSPRUEFER"));
-  Serial.println(F("   Autor : Amir Mobasheraghdam"));
-  Serial.println(F("   Thema : Orange / Weiss"));
-  Serial.println(F("=========================================="));
-}
-
-void kanalberichtDrucken(int kanal) {
-  Serial.print(F("Ader "));
-  Serial.print(kanal + 1);
-  Serial.print(F(": "));
-
-  if (ergebnis.kurzschluss[kanal]) {
-    Serial.println(F("KURZSCHLUSS"));
-    return;
-  }
-
-  if (!ergebnis.verbindung[kanal]) {
-    Serial.println(F("UNTERBROCHEN"));
-    return;
-  }
-
-  if (ergebnis.falschVerdrahtet[kanal]) {
-    Serial.print(F("FALSCH VERDRAHTET -> erkannt an RX "));
-    Serial.println(ergebnis.erkannterPin[kanal] + 1);
-    return;
-  }
-
-  Serial.print(F("OK -> RX "));
-  Serial.println(ergebnis.erkannterPin[kanal] + 1);
-}
-
-void zusammenfassungDrucken() {
-  kopfzeileDrucken();
+void kabelPruefen() {
+  ergebnisLoeschen();
 
   for (int i = 0; i < CHANNEL_COUNT; i++) {
-    kanalberichtDrucken(i);
+    einzelneAderPruefen(i);
+  }
+}
+
+void titelDrucken() {
+  Serial.println();
+  Serial.println(F("=========================================="));
+  Serial.println(F("        ETHERNET KABELTESTER"));
+  Serial.println(F("        Autor: Amir Mobasheraghdam"));
+  Serial.println(F("        Design: Orange / Weiss"));
+  Serial.println(F("=========================================="));
+}
+
+void aderBerichtDrucken(int ader) {
+  Serial.print(F("Ader "));
+  Serial.print(ader + 1);
+  Serial.print(F(": "));
+
+  if (ergebnis.hatKurzschluss[ader]) {
+    Serial.println(F("Kurzschluss erkannt"));
+    return;
+  }
+
+  if (!ergebnis.hatVerbindung[ader]) {
+    Serial.println(F("Keine Verbindung"));
+    return;
+  }
+
+  if (ergebnis.istFalschVerdrahtet[ader]) {
+    Serial.print(F("Falsch verdrahtet, erkannt an RX "));
+    Serial.println(ergebnis.erkannterRxPin[ader] + 1);
+    return;
+  }
+
+  Serial.print(F("In Ordnung, erkannt an RX "));
+  Serial.println(ergebnis.erkannterRxPin[ader] + 1);
+}
+
+void ergebnisDrucken() {
+  titelDrucken();
+
+  for (int i = 0; i < CHANNEL_COUNT; i++) {
+    aderBerichtDrucken(i);
   }
 
   Serial.println(F("------------------------------------------"));
 
-  if (ergebnis.bestanden) {
-    Serial.println(F("ERGEBNIS: BESTANDEN"));
+  if (ergebnis.istBestanden) {
+    Serial.println(F("Gesamtergebnis: BESTANDEN"));
   } else {
-    Serial.println(F("ERGEBNIS: FEHLER"));
+    Serial.println(F("Gesamtergebnis: FEHLER GEFUNDEN"));
   }
 
   Serial.println(F("=========================================="));
@@ -136,13 +144,13 @@ void zusammenfassungDrucken() {
 
 void setup() {
   Serial.begin(115200);
-  pinsEinrichten();
+  pinsVorbereiten();
   delay(250);
-  kopfzeileDrucken();
+  titelDrucken();
 }
 
 void loop() {
-  kabelTesten();
-  zusammenfassungDrucken();
+  kabelPruefen();
+  ergebnisDrucken();
   delay(LOOP_DELAY_MS);
 }

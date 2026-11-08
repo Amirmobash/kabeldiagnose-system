@@ -1,5 +1,11 @@
 # 🔶 kabeldiagnose-system
 
+
+<p align="center"><img src="docs/images/arduino-rj45-ethernet-wiring-fault-tester.svg" alt="Arduino RJ45 Ethernet continuity and wiring fault tester" width="960" /></p>
+
+<sub>Illustrative project schematic; not an actual CAD export, hardware photograph, or independently tested result.</sub>
+
+
 Ein professionelles und modernes System zur Kabelprüfung und Fehlerdiagnose auf Basis von Arduino.
 
 👨‍💻 Entwickelt von **Amir Mobasheraghdam**
